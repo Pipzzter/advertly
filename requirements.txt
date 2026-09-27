@@ -3,7 +3,7 @@ fastapi
 uvicorn[standard]
 pydantic[email]
 python-dotenv
-sqlalchemy
+sqlalchemy[asyncio]
 alembic
 databases
 psycopg2-binary

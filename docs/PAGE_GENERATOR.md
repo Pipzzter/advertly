@@ -71,7 +71,7 @@ The Copy Injection Agent automatically generates complete landing pages by filli
 html = TemplateService.get_html(template_id)
 metadata = TemplateService.get_metadata(template_id)
 ```
-- Loads HTML template from `/backend/app/static/new_templates/`
+- Loads HTML template from `/backend/app/static/templates/`
 - Reads template metadata (repeatable sections, placeholder definitions)
 - Extracts all placeholders for reporting
 
@@ -167,12 +167,9 @@ backend/app/services/agents/
 
 ### Template Location
 ```
-backend/app/static/new_templates/
+backend/app/static/templates/
 ├── template_metadata.json       # Central metadata for all templates
-├── template_001.html           
-├── template_002.html           
-├── template_003.html           
-└── template_004.html           
+└── template_simple.html         # "Clean Article" — the single default template
 ```
 
 ### Placeholder Types
@@ -385,13 +382,13 @@ IMAGE_PROMPTS = {
 
 #### Process Copy Injection
 ```http
-POST /api/v1/copy-injection/process
+POST /api/v1/copyinjection
 ```
 
 **Request Body:**
 ```json
 {
-  "template_id": "template_001",
+  "template_id": "template_simple",
   "raw_copy": "Your full advertorial copy here...",
   "product_name": "ProductX",
   "product_category": "Health Supplements"
@@ -415,16 +412,13 @@ POST /api/v1/copy-injection/process
 
 #### List Templates
 ```http
-GET /api/v1/copy-injection/templates
+GET /api/v1/copyinjection/templates
 ```
 
 **Response:**
 ```json
 [
-  {"id": "template_001", "name": "Standard Advertorial"},
-  {"id": "template_002", "name": "Long-Form Story"},
-  {"id": "template_003", "name": "Product Focus"},
-  {"id": "template_004", "name": "Listicle Style"}
+  {"id": "template_simple", "name": "Clean Article"}
 ]
 ```
 
@@ -551,7 +545,7 @@ agent = CopyInjectionAgent()
 
 result = await agent.process(
     CopyInjectionInput(
-        template_id="template_001",
+        template_id="template_simple",
         raw_copy="""
         HEADLINE: Doctors Shocked by New Discovery
         
@@ -577,7 +571,7 @@ else:
 import { copyInjectionApi } from '@/api/agents/copyInjection';
 
 const result = await copyInjectionApi.process({
-  template_id: 'template_001',
+  template_id: 'template_simple',
   raw_copy: advertorialCopy,
   product_name: 'HealthMax Pro',
   product_category: 'Health Supplements',

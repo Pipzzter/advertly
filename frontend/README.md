@@ -1,48 +1,50 @@
-# frontend
+# Advertly — Frontend
 
-This template should help get you started developing with Vue 3 in Vite.
+Vue 3 + TypeScript + Vite single-page app for Advertly. It provides the UI for pasting
+an HTML template and raw advertorial copy, calling the backend generator, previewing the
+result, and downloading it as a self-contained ZIP.
 
-## Recommended IDE Setup
+> The full project overview, architecture, and setup live in the [root README](../README.md).
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## Prerequisites
 
-## Recommended Browser Setup
+- Node.js 20+
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+## Develop
 
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
-
-```sh
+```bash
 npm install
+npm run dev        # Vite dev server on http://localhost:5173
 ```
 
-### Compile and Hot-Reload for Development
+## Build & checks
 
-```sh
-npm run dev
+```bash
+npm run build      # type-check + production build to dist/
+npm run type-check # vue-tsc, no emit
+npm run lint       # eslint --fix
+npm run format     # prettier
 ```
 
-### Type-Check, Compile and Minify for Production
+## Configuration
 
-```sh
-npm run build
+Copy `.env.example` to `.env`:
+
+```env
+VITE_API_URL=/api/v1
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+API requests target `VITE_API_URL`. In the Docker setup this path is proxied to the
+backend by nginx (see `docker/frontend/nginx.conf`).
 
-```sh
-npm run lint
+## Structure
+
+```
+src/
+├── api/          # typed API clients (agents/copyInjection.ts)
+├── components/   # brand, layout, and feature components
+├── layouts/      # page shell
+├── pages/        # HomePage, CopyInjectionPage
+├── router/       # vue-router routes
+└── types/        # shared types (agent registry)
 ```

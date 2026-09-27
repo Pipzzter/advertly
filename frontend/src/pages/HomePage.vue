@@ -1,14 +1,15 @@
 <script setup lang="ts">
+import AppLogo from '@/components/brand/AppLogo.vue'
 import { agents } from '@/types/agent'
-
 </script>
 
 <template>
   <div>
     <div class="text-center mb-12">
-      <h1 class="text-4xl font-bold text-white mb-4">AdForge</h1>
+      <AppLogo :size="88" alt="" class="mx-auto mb-5" />
+      <h1 class="text-4xl font-bold text-white mb-4">Advertly</h1>
       <p class="text-slate-400 text-lg max-w-2xl mx-auto">
-        Transform your marketing copy into beautiful, ready-to-publish landing pages with AI-powered content and image generation.
+        Turn raw marketing copy into ready-to-publish advertorial landing pages, with structured sections and contextual images generated for you.
       </p>
     </div>
 
@@ -28,4 +29,3 @@ import { agents } from '@/types/agent'
     </div>
   </div>
 </template>
-

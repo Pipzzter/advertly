@@ -4,7 +4,7 @@ services:
       context: ..
       dockerfile: docker/backend/Dockerfile
       target: ${APP_ENV:-development}
-    container_name: med-agents-backend
+    container_name: advertly-backend
     env_file:
       - ../backend/.env
     environment:
@@ -22,7 +22,7 @@ services:
       context: ..
       dockerfile: docker/frontend/Dockerfile
       target: ${APP_ENV:-development}
-    container_name: med-agents-frontend
+    container_name: advertly-frontend
     ports:
       - "5173:5173"
     volumes:
@@ -35,7 +35,7 @@ services:
 
   db:
     image: postgres:latest
-    container_name: med-agents-db
+    container_name: advertly-db
     restart: unless-stopped
     env_file:
       - ../backend/.env

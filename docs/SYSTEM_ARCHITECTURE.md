@@ -1,4 +1,4 @@
-# AI Funnel Page Generator
+# Advertly — System Architecture
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════╗
@@ -9,7 +9,7 @@
 ║   │                │      │                     │      │                │            ║
 ║   ├────────────────┤      ├─────────────────────┤      ├────────────────┤            ║
 ║   │                │      │                     │      │                │            ║
-║   │  HTML Template │      │  Gemini 3.1 Pro     │      │  Complete HTML │            ║
+║   │  HTML Template │      │  Gemini 2.5 Flash   │      │  Complete HTML │            ║
 ║   │                │ ───► │  (Parse Copy)       │ ───► │                │            ║
 ║   │  Raw Copy      │      │                     │      │  AI Images     │            ║
 ║   │                │      │  Nano Banana        │      │  (Base64)      │            ║

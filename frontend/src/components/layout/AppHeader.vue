@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import AppLogo from '@/components/brand/AppLogo.vue'
 import { agents } from '@/types/agent'
 
 const router = useRouter()
@@ -14,9 +15,13 @@ function selectAgent(route: string) {
 
 <template>
   <header class="bg-slate-900 border-b border-slate-700">
-    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-      <router-link to="/" class="text-xl font-bold text-white hover:text-slate-300">
-        AdForge
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
+      <router-link
+        to="/"
+        class="inline-flex items-center gap-3 text-xl font-bold text-white hover:text-slate-300"
+      >
+        <AppLogo alt="" />
+        <span>Advertly</span>
       </router-link>
 
       <div class="relative">
@@ -24,7 +29,8 @@ function selectAgent(route: string) {
           @click="isDropdownOpen = !isDropdownOpen"
           class="flex items-center gap-2 px-4 py-2 bg-slate-800 text-slate-200 rounded-lg hover:bg-slate-700 transition-colors"
         >
-          <span>What would you like to do?</span>
+          <span class="hidden sm:inline">What would you like to do?</span>
+          <span class="sm:hidden">Tools</span>
           <svg
             class="w-4 h-4 transition-transform"
             :class="{ 'rotate-180': isDropdownOpen }"
@@ -59,4 +65,3 @@ function selectAgent(route: string) {
     </div>
   </header>
 </template>
-
