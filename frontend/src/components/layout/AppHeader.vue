@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import AppLogo from '@/components/brand/AppLogo.vue'
 import { agents } from '@/types/agent'
 
 const router = useRouter()
@@ -15,7 +16,11 @@ function selectAgent(route: string) {
 <template>
   <header class="bg-slate-900 border-b border-slate-700">
     <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-      <router-link to="/" class="text-xl font-bold text-white hover:text-slate-300">
+      <router-link
+        to="/"
+        class="flex items-center gap-2 text-xl font-bold text-white hover:text-slate-300"
+      >
+        <AppLogo />
         Advertly
       </router-link>
 

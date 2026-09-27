@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <title>Advertly logo</title>
+  <defs>
+    <linearGradient id="brand" x1="56" y1="104" x2="440" y2="432" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6366F1" />
+      <stop offset="1" stop-color="#8B5CF6" />
+    </linearGradient>
+  </defs>
+  <path
+    fill="url(#brand)"
+    d="M214 80H298L464 432H362L256 202L198 328H288L314 384H172L150 432H48L214 80Z"
+  />
+</svg>

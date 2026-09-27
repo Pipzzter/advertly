@@ -1,5 +1,7 @@
 <div align="center">
-  <img src="./frontend/public/advertly-logo.png" alt="Advertly logo" width="112" height="112">
+  <a href="./frontend/public/advertly-logo.png">
+    <img src="./frontend/public/advertly-logo.png" alt="Advertly logo" width="112" height="112">
+  </a>
   <h1>Advertly</h1>
   <p>From raw copy to ready-to-publish advertorials.</p>
   <p><strong>For marketers and media buyers turning raw campaign copy into polished advertorial landing pages,<br>with structured sections, on-page layout, and contextual imagery generated automatically.</strong></p>
