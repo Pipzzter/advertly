@@ -6,7 +6,7 @@
   <p>From raw copy to ready-to-publish advertorials.</p>
   <p><strong>For marketers and media buyers turning raw campaign copy into polished advertorial landing pages,<br>with structured sections, on-page layout, and contextual imagery generated automatically.</strong></p>
   <p><a href="#how-to-run-it"><strong>▶ Run Advertly locally</strong></a></p>
-  <p><a href="#what-it-does">What it does</a> · <a href="#who-it-is-for">Who it's for</a> · <a href="#how-to-run-it">Run it</a> · <a href="#see-it-working">Walkthrough</a> · <a href="#how-the-ai-works">How the AI works</a> · <a href="#how-its-built">How it's built</a> · <a href="#does-it-hold-up">Tests</a></p>
+  <p><a href="#what-it-does">What it does</a> · <a href="#who-it-is-for">Who it's for</a> · <a href="#how-to-run-it">Run it</a> · <a href="#see-it-working">Walkthrough</a> · <a href="#example-run">Example</a> · <a href="#how-the-ai-works">How the AI works</a> · <a href="#how-its-built">How it's built</a> · <a href="#does-it-hold-up">Tests</a></p>
   <p>
     <img alt="Python 3.12" src="https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white">
     <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-async-009688?style=flat-square&logo=fastapi&logoColor=white">
@@ -129,6 +129,39 @@ Content-Type: application/json
 The returned `html` is self-contained (images are inline base64 data URIs), so preview and
 ZIP packaging happen entirely client-side.
 
+### Example run
+
+[`backend/app/static/example/`](backend/app/static/example/) is a real run you can open and
+compare with the template it started from, to see what the models did:
+
+- [`input.txt`](backend/app/static/example/input.txt) — the raw copy that was pasted in
+  (PawSpring is a made-up product)
+- [`index.html`](backend/app/static/example/index.html) — the page Advertly generated, exactly as
+  **Download ZIP** gives it to you; download it and open it in a browser
+- [`template_simple.html`](backend/app/static/templates/template_simple.html) — the template it
+  filled, with a `[… goes here]` placeholder in every slot
+
+It was generated with `gpt-6-luna` and `gpt-image-2.5-flare` in 44 seconds: 12 images, about
+$0.18 in API usage.
+
+<table>
+  <tr>
+    <th>Template</th>
+    <th>Generated page</th>
+  </tr>
+  <tr>
+    <td valign="top"><img src="backend/app/static/example/previews/template-top.jpg" width="400" alt="Template: headline, hero image, author, and first body section placeholders"></td>
+    <td valign="top"><img src="backend/app/static/example/previews/example-top.jpg" width="400" alt="Generated: headline, hero image, author byline, and first body section"></td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="backend/app/static/example/previews/template-bottom.jpg" width="400" alt="Template: product, social proof, review, and offer placeholders"></td>
+    <td valign="top"><img src="backend/app/static/example/previews/example-bottom.jpg" width="400" alt="Generated: product, expert quote, survey, three reviews, and offer"></td>
+  </tr>
+</table>
+
+<sub>Image slots in the template are drawn as grey boxes for this comparison; in the HTML they are
+<code>src="[… goes here]"</code> placeholders. Body sections and reviews repeat once per parsed item.</sub>
+
 ## How the AI works
 
 Advertly is built around a small, extensible **agent architecture**. It ships one agent
@@ -194,7 +227,8 @@ advertly/
 │   │   │       ├── llm_client.py     # OpenAI text client (structured output)
 │   │   │       ├── image_client.py   # OpenAI image client (GPT Image)
 │   │   │       └── copy_injection/   # Copy Injection Agent (parse → fill → images)
-│   │   └── static/templates/         # HTML template + metadata
+│   │   ├── static/templates/         # HTML template + metadata
+│   │   └── static/example/           # example run: input copy + generated page
 │   ├── alembic/                      # database migrations
 │   └── tests/                        # pytest suite
 ├── frontend/                         # Vue 3 + Vite SPA
