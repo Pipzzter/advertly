@@ -49,7 +49,8 @@ Advertly replaces that whole loop.
 
 ## How to run it
 
-**Prerequisites:** Python 3.12+, Node.js 20+, PostgreSQL, and a Google Gemini API key.
+**Prerequisites:** Python 3.12+, Node.js 20+, and a Google Gemini API key. PostgreSQL is
+optional — only the auth/user endpoints use it.
 
 ```bash
 git clone https://github.com/Pipzzter/advertly.git
@@ -64,7 +65,7 @@ python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r ../requirements.txt
 cp .env.example .env             # then set GEMINI_API_KEY (and DB creds if needed)
-alembic upgrade head             # create tables (requires PostgreSQL running)
+alembic upgrade head             # optional: auth/user tables (requires PostgreSQL running)
 uvicorn app.main:app --reload    # http://localhost:8000  ·  API docs at /api/v1/docs
 ```
 
@@ -76,6 +77,9 @@ npm install
 cp .env.example .env
 npm run dev                      # http://localhost:5173
 ```
+
+The dev server proxies `/api` to the backend at `http://127.0.0.1:8000`; set
+`API_PROXY_TARGET` to point it somewhere else.
 
 ### Or with Docker
 
@@ -93,15 +97,14 @@ docker compose up --build        # backend + frontend + PostgreSQL
 **In the app:**
 
 1. Open `http://localhost:5173` and choose **Page Generator**.
-2. Paste your **HTML template** (with `[... goes here]` placeholder markers) and your
-   **raw marketing copy**.
+2. Pick a **template** from the dropdown and paste your **raw marketing copy**.
 3. Generate. Advertly parses the copy, fills the template, and generates the images.
 4. **Preview** the finished page inline, then **download it as a ZIP**.
 
 **Under the hood** — it's a single API call:
 
 ```http
-POST /api/v1/copyinjection
+POST /api/v1/agents/copyinjection
 Content-Type: application/json
 
 {

@@ -26,7 +26,8 @@ export default defineConfig({
     allowedHosts: ['hauntedly-venose-melissa.ngrok-free.dev'],
     proxy: {
       '/api': {
-        target: 'http://backend:8000',
+        // Local uvicorn by default; docker-compose points this at the backend service
+        target: process.env.API_PROXY_TARGET || 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
     },

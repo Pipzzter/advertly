@@ -382,7 +382,7 @@ IMAGE_PROMPTS = {
 
 #### Process Copy Injection
 ```http
-POST /api/v1/copyinjection
+POST /api/v1/agents/copyinjection
 ```
 
 **Request Body:**
@@ -412,7 +412,7 @@ POST /api/v1/copyinjection
 
 #### List Templates
 ```http
-GET /api/v1/copyinjection/templates
+GET /api/v1/agents/copyinjection/templates
 ```
 
 **Response:**

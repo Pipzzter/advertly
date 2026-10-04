@@ -32,6 +32,8 @@ services:
       - backend
     env_file:
       - ../frontend/.env
+    environment:
+      - API_PROXY_TARGET=http://backend:8000
 
   db:
     image: postgres:latest
