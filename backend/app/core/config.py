@@ -29,6 +29,16 @@ def _env_optional(name: str) -> str | None:
     return value if value not in (None, "") else None
 
 
+def _env_optional_int(name: str, default: int) -> int:
+    raw_value = _env_optional(name)
+    if raw_value is None:
+        return default
+    try:
+        return int(raw_value)
+    except ValueError as exc:
+        raise RuntimeError(f"Environment variable '{name}' must be an integer") from exc
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str = field(default_factory=lambda: _env_required("APP_NAME"))
@@ -61,8 +71,23 @@ class Settings:
     )
     log_level: str = field(default_factory=lambda: _env_optional("LOG_LEVEL") or "INFO")
 
-    # AI/LLM Settings
-    gemini_api_key: str = field(default_factory=lambda: _env_required("GEMINI_API_KEY"))
+    # AI/LLM Settings (OpenAI)
+    openai_api_key: str = field(default_factory=lambda: _env_required("OPENAI_API_KEY"))
+    openai_text_model: str = field(
+        default_factory=lambda: _env_optional("OPENAI_TEXT_MODEL") or "gpt-6-luna"
+    )
+    openai_reasoning_effort: str | None = field(
+        default_factory=lambda: _env_optional("OPENAI_REASONING_EFFORT")
+    )
+    openai_image_model: str = field(
+        default_factory=lambda: _env_optional("OPENAI_IMAGE_MODEL") or "gpt-image-2.5-flare"
+    )
+    openai_image_quality: str = field(
+        default_factory=lambda: _env_optional("OPENAI_IMAGE_QUALITY") or "medium"
+    )
+    openai_image_concurrency: int = field(
+        default_factory=lambda: _env_optional_int("OPENAI_IMAGE_CONCURRENCY", 4)
+    )
 
 
 @lru_cache

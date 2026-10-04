@@ -1,29 +1,31 @@
 """
-Gemini Image Client (Nano Banana)
-==================================
+OpenAI Image Client (GPT Image)
+===============================
 
-Wraps gemini-2.5-flash-image for photorealistic image generation.
+Wraps OpenAI's Image API for photorealistic image generation.
 Returns base64 data URIs for direct embedding in HTML.
 
-Model: gemini-2.5-flash-image  (cheapest / fastest — Nano Banana)
-Docs:  project_docs/nano_banana.md
+Model: OPENAI_IMAGE_MODEL (default gpt-image-2.5-flare — the fast GPT Image model)
 """
 
 import asyncio
-import base64
 import logging
 import random
 from enum import Enum
+from functools import cached_property
 from typing import Optional
 
-from google import genai
-from google.genai import types
+from openai import AsyncOpenAI, RateLimitError
 
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-IMAGE_MODEL = "gemini-2.5-flash-image"
+# JPEG keeps the inline base64 images small; OpenAI also generates it faster than PNG
+JPEG_COMPRESSION = 85
+
+# Base wait after hitting the per-minute image limit (Tier 1 allows 5 images/minute)
+RATE_LIMIT_WAIT_SECONDS = 20
 
 
 class ImageType(str, Enum):
@@ -279,10 +281,19 @@ def get_system_prompt_for_image_type(image_type: ImageType) -> str:
     return prompts.get(image_type, BODY_IMAGE_SYSTEM_PROMPT)
 
 
+def size_for_aspect_ratio(aspect_ratio: str) -> str:
+    """Map a "W:H" aspect ratio to the closest size every GPT Image model supports."""
+    width, height = (float(part) for part in aspect_ratio.split(":"))
+    if width > height:
+        return "1536x1024"
+    if height > width:
+        return "1024x1536"
+    return "1024x1024"
 
-class GeminiImageClient:
+
+class OpenAIImageClient:
     """
-    Generates images using Gemini 2.5 Flash Image (Nano Banana).
+    Generates images using OpenAI GPT Image models (default: gpt-image-2.5-flare).
 
     Returns base64 data URIs for direct embedding in HTML, eliminating
     the need for file storage and separate HTTP requests.
@@ -293,7 +304,7 @@ class GeminiImageClient:
     - PRODUCT: Product introduction images that demonstrate mechanism
 
     Usage:
-        client = GeminiImageClient()
+        client = OpenAIImageClient()
 
         # Headline image (creates curiosity)
         data_uri = await client.generate(
@@ -312,10 +323,21 @@ class GeminiImageClient:
         html = f'<img src="{data_uri}" />'
     """
 
-    def __init__(self, api_key: Optional[str] = None) -> None:
-        self.client = genai.Client(
-            api_key=api_key or get_settings().gemini_api_key
-        )
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        quality: Optional[str] = None,
+    ) -> None:
+        settings = get_settings()
+        self.model = model or settings.openai_image_model
+        self.quality = quality or settings.openai_image_quality
+        self._api_key = api_key or settings.openai_api_key
+
+    @cached_property
+    def client(self) -> AsyncOpenAI:
+        # Created on first use so a missing API key surfaces as a request error
+        return AsyncOpenAI(api_key=self._api_key, max_retries=3)
 
     async def generate(
         self,
@@ -337,75 +359,55 @@ class GeminiImageClient:
         Args:
             prompt:       Photorealistic description of the image.
             image_type:   Type of advertorial image (HEADLINE, BODY, PRODUCT).
-            aspect_ratio: One of: 1:1 | 2:3 | 3:2 | 3:4 | 4:3 | 4:5 | 5:4
-                          | 9:16 | 16:9 | 21:9
-            max_retries:  Retries on transient errors.
+            aspect_ratio: "W:H" ratio, mapped to the closest supported size
+                          (landscape 1536x1024, portrait 1024x1536, square 1024x1024).
+            max_retries:  Retries after hitting the per-minute image rate limit.
 
         Returns:
-            Base64 data URI string, e.g. "data:image/png;base64,iVBORw0..."
+            Base64 data URI string, e.g. "data:image/jpeg;base64,/9j/4AAQ..."
         """
         # Get the appropriate system prompt for this image type
         system_prompt = get_system_prompt_for_image_type(image_type)
 
         # Combine system prompt with user prompt for better guidance
         full_prompt = f"{system_prompt}\n\n---\n\n## Image Request:\n{prompt}"
+        size = size_for_aspect_ratio(aspect_ratio)
 
-        config = types.GenerateContentConfig(
-            response_modalities=["Image"],
-            image_config=types.ImageConfig(aspect_ratio=aspect_ratio),
-        )
-
-        last_error: Optional[Exception] = None
-
-        for attempt in range(max_retries):
+        for attempt in range(max_retries + 1):
             try:
-                response = await asyncio.to_thread(
-                    self.client.models.generate_content,
-                    model=IMAGE_MODEL,
-                    contents=[full_prompt],
-                    config=config,
+                response = await self.client.images.generate(
+                    model=self.model,
+                    prompt=full_prompt,
+                    size=size,
+                    quality=self.quality,
+                    output_format="jpeg",
+                    output_compression=JPEG_COMPRESSION,
                 )
-
-                for part in response.parts:
-                    # Skip thought parts
-                    if getattr(part, "thought", False):
-                        continue
-                    if part.inline_data is not None:
-                        # Get raw image bytes directly from inline_data
-                        image_bytes = part.inline_data.data
-                        mime_type = part.inline_data.mime_type or "image/png"
-                        b64_data = base64.b64encode(image_bytes).decode("utf-8")
-                        data_uri = f"data:{mime_type};base64,{b64_data}"
-
-                        logger.info(
-                            "Image generated: type=%s aspect_ratio=%s size=%d bytes prompt_preview=%s",
-                            image_type.value,
-                            aspect_ratio,
-                            len(image_bytes),
-                            prompt[:80],
-                        )
-                        return data_uri
-
-                raise ValueError("Gemini image response contained no inline_data part")
-
-            except Exception as e:
-                last_error = e
-                err_str = str(e)
-                if "429" in err_str or "503" in err_str or "timeout" in err_str.lower():
-                    wait = (2 ** attempt) + random.uniform(0, 1)
-                    logger.warning(
-                        "Image generation transient error attempt %d/%d: %s — retrying in %.1fs",
-                        attempt + 1,
-                        max_retries,
-                        err_str[:200],
-                        wait,
-                    )
-                    await asyncio.sleep(wait)
-                else:
-                    logger.error("Image generation failed (non-retryable): %s", err_str[:300])
+                break
+            except RateLimitError as e:
+                # An empty balance won't recover by waiting; the per-minute limit will
+                if e.code == "insufficient_quota" or attempt == max_retries:
                     raise
+                wait = RATE_LIMIT_WAIT_SECONDS * (attempt + 1) + random.uniform(0, 2)
+                logger.warning(
+                    "Image rate limit hit, attempt %d/%d — retrying in %.0fs",
+                    attempt + 1,
+                    max_retries,
+                    wait,
+                )
+                await asyncio.sleep(wait)
 
-        if last_error:
-            raise last_error
-        raise RuntimeError("Image generation: max retries exhausted with no result")
+        image = response.data[0] if response.data else None
+        if image is None or not image.b64_json:
+            raise ValueError("OpenAI image response contained no image data")
 
+        logger.info(
+            "Image generated: type=%s size=%s bytes=%d tokens_in=%s tokens_out=%s prompt_preview=%s",
+            image_type.value,
+            size,
+            len(image.b64_json) * 3 // 4,
+            getattr(response.usage, "input_tokens", None),
+            getattr(response.usage, "output_tokens", None),
+            prompt[:80],
+        )
+        return f"data:image/jpeg;base64,{image.b64_json}"

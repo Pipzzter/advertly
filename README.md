@@ -12,7 +12,7 @@
     <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-async-009688?style=flat-square&logo=fastapi&logoColor=white">
     <img alt="Vue 3" src="https://img.shields.io/badge/Vue-3-42b883?style=flat-square&logo=vuedotjs&logoColor=white">
     <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white">
-    <img alt="Gemini" src="https://img.shields.io/badge/Gemini-2.5%20Flash-8E75B2?style=flat-square&logo=googlegemini&logoColor=white">
+    <img alt="OpenAI" src="https://img.shields.io/badge/OpenAI-GPT--6%20Luna-412991?style=flat-square&logo=openai&logoColor=white">
     <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-black?style=flat-square">
   </p>
 </div>
@@ -49,7 +49,7 @@ Advertly replaces that whole loop.
 
 ## How to run it
 
-**Prerequisites:** Python 3.12+, Node.js 20+, and a Google Gemini API key. PostgreSQL is
+**Prerequisites:** Python 3.12+, Node.js 20+, and an OpenAI API key. PostgreSQL is
 optional — only the auth/user endpoints use it.
 
 ```bash
@@ -64,7 +64,7 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r ../requirements.txt
-cp .env.example .env             # then set GEMINI_API_KEY (and DB creds if needed)
+cp .env.example .env             # then set OPENAI_API_KEY (and DB creds if needed)
 alembic upgrade head             # optional: auth/user tables (requires PostgreSQL running)
 uvicorn app.main:app --reload    # http://localhost:8000  ·  API docs at /api/v1/docs
 ```
@@ -89,8 +89,9 @@ docker compose up --build        # backend + frontend + PostgreSQL
 ```
 
 > **Environment:** copy `backend/.env.example` → `backend/.env` and set at least
-> `GEMINI_API_KEY`. The app boots without a live database (the copy generator doesn't need
-> one), but auth/user features and `alembic upgrade head` require PostgreSQL.
+> `OPENAI_API_KEY`. The app boots without a live database (the copy generator doesn't need
+> one), but auth/user features and `alembic upgrade head` require PostgreSQL. OpenAI may ask
+> you to complete Organization Verification before your key can use the GPT Image models.
 
 ## See it working
 
@@ -135,18 +136,19 @@ today — the **Copy Injection Agent** — which orchestrates a six-step pipelin
 
 1. **Load template** — read the HTML plus metadata describing which sections repeat, which
    are optional, and what placeholders exist.
-2. **Parse copy (LLM)** — a single call to **Gemini 2.5 Flash** with *structured output*.
-   The model returns a typed `ParsedCopy` object (Pydantic), not free text: headline, hook,
-   intro, 3–5 body sections, product presentation, unique social proofs, a case study,
-   human-sounding reviews, an offer, and references. The JSON schema is derived from the
-   Pydantic model (`response_json_schema`), so the result is validated on arrival.
+2. **Parse copy (LLM)** — a single call to **GPT-6 Luna** (OpenAI Responses API) with
+   *structured output*. The model returns a typed `ParsedCopy` object (Pydantic), not free
+   text: headline, hook, intro, 3–5 body sections, product presentation, unique social
+   proofs, a case study, human-sounding reviews, an offer, and references. A strict JSON
+   schema is derived from the Pydantic model (`text_format`), so the result is validated on
+   arrival.
 3. **Fill repeatable sections** — clone the body / review / social-proof blocks once per
    parsed item, regenerating element IDs to avoid collisions.
 4. **Fill simple placeholders** — headline, hook, author, date, offer, and so on, with
    sensible fallbacks for required slots.
 5. **Prune and generate images** — remove optional sections that have no content, then
-   generate one image per visual slot with **Gemini 2.5 Flash Image** ("Nano Banana"),
-   embedded inline as base64 data URIs.
+   generate one image per visual slot with **GPT Image 2.5 Flare**, several in parallel,
+   embedded inline as base64 JPEG data URIs.
 6. **Clean up** — strip any placeholder that wasn't filled, so the output is always valid.
 
 Two ideas keep it reliable:
@@ -159,19 +161,21 @@ Two ideas keep it reliable:
   product images show the mechanism — so results read editorial, not stock-photo.
 
 Both the text and image clients run **async with exponential-backoff retries** on
-rate-limit and transient errors (429 / 503 / timeouts). Adding a second agent means
+rate-limit and transient errors (429 / 5xx / timeouts); image generation also waits out
+OpenAI's per-minute image limits. Adding a second agent means
 subclassing `BaseAgent[Input, Output]` and registering a router — the frontend agent
 registry picks it up automatically.
 
-> **Models:** `gemini-2.5-flash` (copy parsing, structured JSON) and
-> `gemini-2.5-flash-image` (image generation). See [`docs/PAGE_GENERATOR.md`](docs/PAGE_GENERATOR.md)
+> **Models:** `gpt-6-luna` (copy parsing, structured JSON) and `gpt-image-2.5-flare` (image
+> generation), both set in `backend/.env` (`OPENAI_TEXT_MODEL`, `OPENAI_IMAGE_MODEL`, plus
+> reasoning effort, image quality, and image concurrency). See [`docs/PAGE_GENERATOR.md`](docs/PAGE_GENERATOR.md)
 > for the full agent deep-dive and [`docs/SYSTEM_ARCHITECTURE.md`](docs/SYSTEM_ARCHITECTURE.md)
 > for the high-level flow.
 
 ## How it's built
 
 **Backend** — Python 3.12 · FastAPI · SQLAlchemy 2 (async) + PostgreSQL · Alembic ·
-Pydantic v2 · google-genai · JWT auth (argon2) · pytest
+Pydantic v2 · OpenAI SDK · JWT auth (argon2) · pytest
 **Frontend** — Vue 3 (Composition API) · TypeScript · Vite · Pinia · Vue Router ·
 Tailwind CSS v4 · JSZip (client-side packaging)
 **Infrastructure** — Docker + Docker Compose (backend, frontend/nginx, PostgreSQL)
@@ -187,8 +191,8 @@ advertly/
 │   │   ├── services/
 │   │   │   └── agents/               # AI agents
 │   │   │       ├── base.py           # abstract BaseAgent[Input, Output]
-│   │   │       ├── llm_client.py     # Gemini text client (structured output)
-│   │   │       ├── image_client.py   # Gemini image client (Nano Banana)
+│   │   │       ├── llm_client.py     # OpenAI text client (structured output)
+│   │   │       ├── image_client.py   # OpenAI image client (GPT Image)
 │   │   │       └── copy_injection/   # Copy Injection Agent (parse → fill → images)
 │   │   └── static/templates/         # HTML template + metadata
 │   ├── alembic/                      # database migrations
@@ -206,7 +210,7 @@ files · a layered backend (api / services / agents / db / schemas).
 
 - **28 backend tests** (pytest, async) covering auth, users, health, schemas, and services.
 - The suite runs against an **in-memory SQLite** database with strict pytest config — **no
-  live database and no Gemini calls required**, so it's CI-friendly.
+  live database and no OpenAI calls required**, so it's CI-friendly.
 - The **frontend is fully type-checked** with `vue-tsc`.
 
 ```bash

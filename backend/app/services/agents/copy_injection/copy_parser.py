@@ -7,7 +7,7 @@ Uses LLM to parse raw advertorial copy into structured sections.
 
 import logging
 
-from app.services.agents.llm_client import GeminiClient
+from app.services.agents.llm_client import OpenAIClient
 from app.services.agents.copy_injection.schemas import ParsedCopy
 
 logger = logging.getLogger(__name__)
@@ -140,7 +140,7 @@ class CopyParser:
     """Parses raw advertorial copy into structured sections using LLM."""
 
     def __init__(self) -> None:
-        self.llm = GeminiClient()
+        self.llm = OpenAIClient()
 
     async def parse(
         self,

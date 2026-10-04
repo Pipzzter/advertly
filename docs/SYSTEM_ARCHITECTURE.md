@@ -9,10 +9,10 @@
 ║   │                │      │                     │      │                │            ║
 ║   ├────────────────┤      ├─────────────────────┤      ├────────────────┤            ║
 ║   │                │      │                     │      │                │            ║
-║   │  HTML Template │      │  Gemini 2.5 Flash   │      │  Complete HTML │            ║
+║   │  HTML Template │      │  GPT-6 Luna         │      │  Complete HTML │            ║
 ║   │                │ ───► │  (Parse Copy)       │ ───► │                │            ║
 ║   │  Raw Copy      │      │                     │      │  AI Images     │            ║
-║   │                │      │  Nano Banana        │      │  (Base64)      │            ║
+║   │                │      │  GPT Image 2.5      │      │  (Base64)      │            ║
 ║   │  Product Info  │      │  (Generate Images)  │      │                │            ║
 ║   │                │      │                     │      │  Ready to Use  │            ║
 ║   └────────────────┘      └─────────────────────┘      └────────────────┘            ║
@@ -21,7 +21,7 @@
 ║                                                                                      ║
 ║   FLOW:  Template + Copy  ──►  LLM Parse  ──►  Fill Placeholders  ──►  Done          ║
 ║                                                                                      ║
-║   TECH:  Python  •  FastAPI  •  Vue 3  •  Gemini API  •                              ║
+║   TECH:  Python  •  FastAPI  •  Vue 3  •  OpenAI API  •                              ║
 ║                                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════════════════════╝
 ```

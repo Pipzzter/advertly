@@ -1,32 +1,28 @@
 """
-Gemini LLM Client
+OpenAI LLM Client
 =================
 
-Client for interacting with Google's Gemini API using the official google-genai SDK.
-Supports Gemini 2.5 Flash with thinking_level parameter.
+Client for OpenAI's Responses API using the official openai SDK.
+Model and reasoning effort come from OPENAI_TEXT_MODEL / OPENAI_REASONING_EFFORT.
 """
 
-import asyncio
 import logging
-import random
-from typing import Optional, Type, TypeVar
+from functools import cached_property
+from typing import Any, Optional, Type, TypeVar
 
-from google import genai
-from google.genai import types
+from openai import AsyncOpenAI
+from openai.types.responses import Response
 from pydantic import BaseModel
 
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-# Gemini 2.5 Flash model ID
-DEFAULT_MODEL = "gemini-2.5-flash"
-
 T = TypeVar("T", bound=BaseModel)
 
 
-class GeminiResponse(BaseModel):
-    """Response from Gemini API."""
+class OpenAIResponse(BaseModel):
+    """Response from the OpenAI API."""
 
     text: str
     prompt_tokens: Optional[int] = None
@@ -34,65 +30,66 @@ class GeminiResponse(BaseModel):
     cached_tokens: Optional[int] = None
 
 
-class GeminiClient:
+class OpenAIClient:
     """
-    Client for Google Gemini API using the official google-genai SDK.
+    Client for the OpenAI Responses API using the official openai SDK.
 
-    Supports Gemini 2.5 Flash with:
-    - thinking_level parameter (low/medium/high)
-    - Structured output via Pydantic models
-    - Retry logic with exponential backoff for rate limits
+    Supports:
+    - Configurable model (default gpt-6-luna) and reasoning effort
+    - Structured output via Pydantic models (strict JSON schema)
+    - Retry logic with exponential backoff for rate limits and transient errors
 
     Usage:
-        client = GeminiClient()
+        client = OpenAIClient()
         response = await client.generate("Your prompt here")
         structured = await client.generate_structured("Your prompt", MySchema)
     """
 
     def __init__(
         self,
-        model: str = DEFAULT_MODEL,
+        model: Optional[str] = None,
         api_key: Optional[str] = None,
+        max_retries: int = 3,
     ) -> None:
-        self.model = model
-        self.client = genai.Client(
-            api_key=api_key or get_settings().gemini_api_key
-        )
+        settings = get_settings()
+        self.model = model or settings.openai_text_model
+        self.reasoning_effort = settings.openai_reasoning_effort
+        self._api_key = api_key or settings.openai_api_key
+        self._max_retries = max_retries
+
+    @cached_property
+    def client(self) -> AsyncOpenAI:
+        # Created on first use so a missing API key surfaces as a request error
+        return AsyncOpenAI(api_key=self._api_key, max_retries=self._max_retries)
 
     async def generate(
         self,
         prompt: str,
-        max_tokens: int = 65536,
-        max_retries: int = 3,
-    ) -> GeminiResponse:
+        max_tokens: Optional[int] = None,
+    ) -> OpenAIResponse:
         """
-        Generate text using Gemini API.
+        Generate text using the OpenAI API.
 
         Args:
             prompt: The prompt to send to the model
-            max_tokens: Maximum output tokens (default 64k)
-            max_retries: Number of retries for transient errors
+            max_tokens: Maximum output tokens, reasoning included (default: model limit)
 
         Returns:
-            GeminiResponse with generated text and token usage
+            OpenAIResponse with generated text and token usage
         """
-        config = types.GenerateContentConfig(
-            max_output_tokens=max_tokens,
-        )
+        logger.debug("Sending request to OpenAI API: model=%s", self.model)
 
-        logger.debug(
-            "Sending request to Gemini API: model=%s",
-            self.model,
+        response = await self.client.responses.create(
+            input=prompt,
+            **self._request_options(max_tokens),
         )
-
-        return await self._call_with_retry(prompt, config, max_retries)
+        return OpenAIResponse(text=response.output_text, **self._log_usage(response))
 
     async def generate_structured(
         self,
         prompt: str,
         schema: Type[T],
-        max_tokens: int = 65536,
-        max_retries: int = 3,
+        max_tokens: Optional[int] = None,
     ) -> T:
         """
         Generate structured output parsed directly into a Pydantic model.
@@ -100,98 +97,82 @@ class GeminiClient:
         Args:
             prompt: The prompt to send to the model
             schema: Pydantic model class to parse the response into
-            max_tokens: Maximum output tokens
-            max_retries: Number of retries for transient errors
+            max_tokens: Maximum output tokens, reasoning included (default: model limit)
 
         Returns:
             Instance of the provided Pydantic schema
         """
-        config = types.GenerateContentConfig(
-            max_output_tokens=max_tokens,
-            response_mime_type="application/json",
-            response_json_schema=schema.model_json_schema(),
-        )
-
         logger.debug(
-            "Sending structured request to Gemini API: model=%s, schema=%s",
+            "Sending structured request to OpenAI API: model=%s, schema=%s",
             self.model,
             schema.__name__,
         )
 
-        response = await self._call_with_retry(prompt, config, max_retries)
+        response = await self.client.responses.parse(
+            input=prompt,
+            text_format=schema,
+            **self._request_options(max_tokens),
+        )
+        self._log_usage(response)
 
-        if not response.text:
+        parsed = response.output_parsed
+        if parsed is None:
+            refusal = next(
+                (
+                    content.refusal
+                    for item in response.output
+                    if item.type == "message"
+                    for content in item.content
+                    if content.type == "refusal"
+                ),
+                None,
+            )
             raise ValueError(
-                f"Gemini returned empty response for schema {schema.__name__}. "
-                "This can happen when thinking mode conflicts with structured output."
+                refusal
+                or f"OpenAI returned no structured output for schema {schema.__name__} "
+                f"(status={response.status})"
             )
 
         logger.debug(
-            "Parsing structured response for schema=%s, text_length=%d, preview=%s",
+            "Parsed structured response for schema=%s, preview=%s",
             schema.__name__,
-            len(response.text),
-            response.text[:200],
+            response.output_text[:200],
         )
 
-        return schema.model_validate_json(response.text)
+        return parsed
 
-    async def _call_with_retry(
-        self,
-        prompt: str,
-        config: types.GenerateContentConfig,
-        max_retries: int,
-    ) -> GeminiResponse:
-        """Execute the API call with exponential backoff retry logic."""
-        last_error: Optional[Exception] = None
+    def _request_options(self, max_tokens: Optional[int]) -> dict[str, Any]:
+        """Build the request options shared by all calls."""
+        options: dict[str, Any] = {"model": self.model, "store": False}
+        # Only sent when configured, since non-reasoning models reject the parameter
+        if self.reasoning_effort:
+            options["reasoning"] = {"effort": self.reasoning_effort}
+        if max_tokens:
+            options["max_output_tokens"] = max_tokens
+        return options
 
-        for attempt in range(max_retries):
-            try:
-                response = await asyncio.to_thread(
-                    self.client.models.generate_content,
-                    model=self.model,
-                    contents=prompt,
-                    config=config,
-                )
+    @staticmethod
+    def _log_usage(response: Response) -> dict[str, Optional[int]]:
+        """Log token usage and return it in OpenAIResponse field names."""
+        usage = response.usage
+        tokens = {
+            "prompt_tokens": getattr(usage, "input_tokens", None),
+            "completion_tokens": getattr(usage, "output_tokens", None),
+            "cached_tokens": getattr(
+                getattr(usage, "input_tokens_details", None), "cached_tokens", None
+            ),
+        }
+        reasoning_tokens = getattr(
+            getattr(usage, "output_tokens_details", None), "reasoning_tokens", None
+        )
 
-                usage = response.usage_metadata
-                prompt_tokens = getattr(usage, "prompt_token_count", None)
-                completion_tokens = getattr(usage, "candidates_token_count", None)
-                cached_tokens = getattr(usage, "cached_content_token_count", None)
-
-                logger.info(
-                    "Gemini response received: prompt_tokens=%s, completion_tokens=%s, cached=%s",
-                    prompt_tokens,
-                    completion_tokens,
-                    cached_tokens,
-                )
-
-                return GeminiResponse(
-                    text=response.text,
-                    prompt_tokens=prompt_tokens,
-                    completion_tokens=completion_tokens,
-                    cached_tokens=cached_tokens,
-                )
-
-            except Exception as e:
-                last_error = e
-                error_str = str(e)
-
-                # Retry on rate limit or transient errors
-                if "429" in error_str or "503" in error_str or "timeout" in error_str.lower():
-                    wait_time = (2 ** attempt) + random.uniform(0, 1)
-                    logger.warning(
-                        "Transient error on attempt %d/%d: %s. Retrying in %.1fs",
-                        attempt + 1,
-                        max_retries,
-                        error_str[:200],
-                        wait_time,
-                    )
-                    await asyncio.sleep(wait_time)
-                else:
-                    logger.error("Gemini API error (non-retryable): %s", error_str[:500])
-                    raise
-
-        if last_error:
-            raise last_error
-        raise RuntimeError("Max retries exhausted with no response")
-
+        logger.info(
+            "OpenAI response received: model=%s, prompt_tokens=%s, completion_tokens=%s "
+            "(reasoning=%s), cached=%s",
+            response.model,
+            tokens["prompt_tokens"],
+            tokens["completion_tokens"],
+            reasoning_tokens,
+            tokens["cached_tokens"],
+        )
+        return tokens

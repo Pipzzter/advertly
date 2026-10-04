@@ -83,7 +83,7 @@ parsed_copy = await self.copy_parser.parse(
     product_category=input_data.product_category,
 )
 ```
-- Sends raw copy to **Gemini 2.5 Flash** with structured output
+- Sends raw copy to **GPT-6 Luna** (OpenAI Responses API) with structured output
 - LLM identifies and categorizes all content sections
 - Returns a `ParsedCopy` Pydantic model with structured data
 
@@ -118,7 +118,7 @@ html = self._remove_empty_optional_sections(html, parsed_copy)
 html = await self.image_generator.generate_all_images(html, parsed_copy)
 ```
 - Generates images for all placeholder markers
-- Uses **Gemini 2.5 Flash Image** model
+- Uses the **GPT Image 2.5 Flare** model, several images in parallel
 - Embeds images as base64 data URIs (no external files)
 
 #### 7. Clean Unfilled Placeholders
@@ -137,8 +137,8 @@ html = self._clean_unfilled_placeholders(html)
 ```
 backend/app/services/agents/
 ├── base.py                      # Abstract base agent class
-├── llm_client.py                # Gemini LLM client (text generation)
-├── image_client.py              # Gemini Image client (image generation)
+├── llm_client.py                # OpenAI LLM client (text generation)
+├── image_client.py              # OpenAI Image client (image generation)
 └── copy_injection/
     ├── __init__.py
     ├── agent.py                 # Main CopyInjectionAgent orchestrator
@@ -158,8 +158,8 @@ backend/app/services/agents/
 | `PlaceholderFiller` | Handles text replacement and section cloning |
 | `ImageGenerator` | Generates images and replaces image placeholders |
 | `TemplateService` | Loads templates and metadata from filesystem |
-| `GeminiClient` | LLM API client with structured output support |
-| `GeminiImageClient` | Image generation API client |
+| `OpenAIClient` | LLM API client with structured output support |
+| `OpenAIImageClient` | Image generation API client |
 
 ---
 
@@ -252,9 +252,9 @@ backend/app/static/templates/
 ## 🤖 Copy Parsing
 
 ### LLM Model
-- **Model:** Gemini 2.5 Flash (`gemini-2.5-flash`)
-- **Output:** Structured JSON via Pydantic schema
-- **Max Tokens:** 65,536
+- **Model:** GPT-6 Luna (`gpt-6-luna`, set via `OPENAI_TEXT_MODEL`)
+- **Output:** Structured JSON via Pydantic schema (strict mode)
+- **Max Tokens:** model limit (128,000 for GPT-6 Luna)
 
 ### What the LLM Extracts
 
@@ -312,9 +312,10 @@ The copy parser prompt instructs the LLM to identify:
 ## 🖼️ Image Generation
 
 ### Technology
-- **Model:** Gemini 2.5 Flash Image (`gemini-2.5-flash-image`)
-- **Output:** Base64 data URIs (embedded directly in HTML)
-- **Retry Logic:** Exponential backoff for rate limits
+- **Model:** GPT Image 2.5 Flare (`gpt-image-2.5-flare`, set via `OPENAI_IMAGE_MODEL`)
+- **Output:** Base64 JPEG data URIs (embedded directly in HTML)
+- **Concurrency:** Up to `OPENAI_IMAGE_CONCURRENCY` images at once (default 4)
+- **Retry Logic:** Exponential backoff, plus waiting out per-minute image limits
 
 ### Image Type Guidelines
 
@@ -502,29 +503,26 @@ class ParsedCopy(BaseModel):
 ### LLM Client Configuration
 
 ```python
-class GeminiClient:
-    model = "gemini-2.5-flash"
-    max_tokens = 65536
-    response_mime_type = "application/json"  # For structured output
+class OpenAIClient:
+    model = "gpt-6-luna"              # OPENAI_TEXT_MODEL
+    reasoning_effort = None           # OPENAI_REASONING_EFFORT (None = model default)
+    text_format = ParsedCopy          # Strict JSON schema structured output
 ```
 
 ### Image Client Configuration
 
 ```python
-class GeminiImageClient:
-    model = "gemini-2.5-flash-image"
-    supported_aspect_ratios = [
-        "1:1", "2:3", "3:2", "3:4", "4:3", 
-        "4:5", "5:4", "9:16", "16:9", "21:9"
-    ]
+class OpenAIImageClient:
+    model = "gpt-image-2.5-flare"     # OPENAI_IMAGE_MODEL
+    quality = "medium"                # OPENAI_IMAGE_QUALITY
+    output_format = "jpeg"            # 85% compression, returned as a base64 data URI
+    sizes = {"landscape": "1536x1024", "portrait": "1024x1536", "square": "1024x1024"}
 ```
 
 ### Retry Logic
-Both clients implement exponential backoff:
-- Initial wait: 2 seconds
-- Multiplier: 2x per attempt
-- Max retries: 3
-- Jitter: Random 0-1 second addition
+- Both clients use the OpenAI SDK's retries (3 attempts, exponential backoff with jitter) for 429, 5xx, and timeouts
+- Image generation also waits out per-minute image limits (20s, 40s, 60s) and fails fast when the account is out of credits (`insufficient_quota`)
+- Images are generated concurrently, capped by `OPENAI_IMAGE_CONCURRENCY`
 
 ### Error Handling
 - Failed image generation returns SVG placeholder
@@ -599,5 +597,5 @@ The agent is successful when:
 
 ## 🚀 One-Sentence Summary
 
-> The Copy Injection Agent takes predefined HTML templates, uses Gemini 2.5 Flash to parse and structure raw advertorial copy, fills all placeholders with appropriate content, generates context-aware images using Gemini 2.5 Flash Image, and outputs a fully ready landing page—all automatically.
+> The Copy Injection Agent takes predefined HTML templates, uses GPT-6 Luna to parse and structure raw advertorial copy, fills all placeholders with appropriate content, generates context-aware images using GPT Image 2.5 Flare, and outputs a fully ready landing page—all automatically.
 
